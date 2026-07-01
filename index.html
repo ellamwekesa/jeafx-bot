@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>JeaFX Bot — XAU/USD Live Analyst</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #080a0f;
+  --bg2:      #0d1017;
+  --surface:  #111520;
+  --surface2: #161b28;
+  --border:   #1c2333;
+  --border2:  #243044;
+  --gold:     #f0b429;
+  --gold2:    #d4982a;
+  --golddim:  rgba(240,180,41,0.12);
+  --buy:      #10b981;
+  --buydim:   rgba(16,185,129,0.1);
+  --sell:     #f43f5e;
+  --selldim:  rgba(244,63,94,0.1);
+  --wait:     #6366f1;
+  --waitdim:  rgba(99,102,241,0.1);
+  --text:     #dde3f0;
+  --sub:      #8896b3;
+  --muted:    #4a5568;
+  --font:     'Space Grotesk', system-ui, sans-serif;
+  --mono:     'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{min-height:100vh;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;}
+button{cursor:pointer;font-family:var(--font);}
+input,textarea{font-family:var(--font);outline:none;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* LAYOUT */
+.app{display:grid;grid-template-rows:auto auto 1fr;min-height:100vh;}
+
+/* TOPBAR */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{width:36px;height:36px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.brand-name{font-size:17px;font-weight:700;letter-spacing:-0.3px;}
+.brand-sub{font-size:11px;color:var(--sub);font-family:var(--mono);letter-spacing:0.5px;}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+.live-pill{display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);color:var(--buy);background:var(--buydim);padding:5px 10px;border-radius:20px;border:1px solid rgba(16,185,129,0.2);}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--buy);animation:livepulse 1.6s ease-in-out infinite;}
+@keyframes livepulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{opacity:.6;box-shadow:0 0 0 5px rgba(16,185,129,0);}}
+
+/* SESSION STRIP */
+.session-strip{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 24px;display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+.sess-name{font-weight:600;font-family:var(--mono);}
+.sess-tip{color:var(--sub);}
+
+/* MAIN GRID */
+.main{display:grid;grid-template-columns:300px 1fr 320px;gap:0;height:calc(100vh - 98px);}
+
+/* PANELS */
+.left-panel{border-right:1px solid var(--border);overflow-y:auto;background:var(--bg2);}
+.center-panel{overflow-y:auto;padding:20px;}
+.right-panel{border-left:1px solid var(--border);overflow-y:auto;background:var(--bg2);}
+
+/* PANEL SECTIONS */
+.panel-section{padding:16px;}
+.panel-section+.panel-section{border-top:1px solid var(--border);}
+.panel-title{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;}
+
+/* SCAN BUTTON */
+.scan-btn{width:100%;padding:13px;background:var(--gold);color:#080a0f;border:none;border-radius:10px;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s,transform .1s;letter-spacing:-0.2px;}
+.scan-btn:hover{background:var(--gold2);}
+.scan-btn:active{transform:scale(.98);}
+.scan-btn:disabled{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+
+/* SIGNAL CARD */
+.signal-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;}
+.signal-dir-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.signal-dir{font-size:22px;font-weight:700;font-family:var(--mono);}
+.signal-dir.buy{color:var(--buy);}
+.signal-dir.sell{color:var(--sell);}
+.signal-dir.wait{color:var(--wait);}
+.signal-tf-badge{font-size:11px;font-family:var(--mono);background:var(--surface2);padding:4px 8px;border-radius:5px;color:var(--sub);}
+
+/* CONFIDENCE METER */
+.confidence-wrap{margin-bottom:16px;}
+.confidence-label-row{display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;}
+.confidence-label{color:var(--sub);}
+.confidence-val{font-family:var(--mono);font-weight:600;}
+.confidence-track{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;position:relative;}
+.confidence-fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+
+/* CONFLUENCE CHECKLIST */
+.confluence-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.conf-item{display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;}
+.conf-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.conf-dot.yes{background:var(--buy);}
+.conf-dot.no{background:var(--muted);}
+.conf-label{color:var(--sub);}
+.conf-label.yes{color:var(--text);}
+
+/* LEVELS */
+.levels-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0;}
+.level-box{background:var(--bg2);border-radius:9px;padding:11px;text-align:center;border:1px solid var(--border);}
+.level-lbl{font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:5px;letter-spacing:0.5px;}
+.level-val{font-family:var(--mono);font-weight:600;font-size:14px;}
+.level-val.entry{color:var(--gold);}
+.level-val.sl{color:var(--sell);}
+.level-val.tp{color:var(--buy);}
+
+/* ANALYSIS TEXT */
+.analysis-text{font-size:13px;line-height:1.75;color:var(--sub);white-space:pre-wrap;border-top:1px solid var(--border);padding-top:14px;margin-top:2px;}
+
+/* ALERT BANNER */
+.alert-banner{padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;animation:slidein .3s ease;}
+@keyframes slidein{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+.alert-banner.buy{background:var(--buydim);border:1px solid rgba(16,185,129,0.3);color:var(--buy);}
+.alert-banner.sell{background:var(--selldim);border:1px solid rgba(244,63,94,0.3);color:var(--sell);}
+.alert-banner.wait{background:var(--waitdim);border:1px solid rgba(99,102,241,0.3);color:var(--wait);}
+
+/* ZONE MAP */
+.zone-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.zone-item:last-child{border-bottom:none;}
+.zone-type{font-weight:600;}
+.zone-range{font-family:var(--mono);font-size:12px;}
+.zone-fresh{font-size:10px;padding:2px 7px;border-radius:10px;font-family:var(--mono);}
+.zone-fresh.yes{background:var(--buydim);color:var(--buy);}
+.zone-fresh.no{background:var(--surface2);color:var(--muted);}
+
+/* SIGNAL HISTORY */
+.history-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.history-item:last-child{border-bottom:none;}
+.history-badge{font-size:11px;font-family:var(--mono);font-weight:600;padding:3px 8px;border-radius:5px;flex-shrink:0;margin-top:1px;}
+.history-badge.buy{background:var(--buydim);color:var(--buy);}
+.history-badge.sell{background:var(--selldim);color:var(--sell);}
+.history-badge.wait{background:var(--waitdim);color:var(--wait);}
+.history-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;}
+.history-sum{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.4;}
+
+/* CHAT */
+.chat-wrap{display:flex;flex-direction:column;height:100%;}
+.chat-messages{flex:1;overflow-y:auto;padding:0 16px;display:flex;flex-direction:column;gap:10px;}
+.bubble{max-width:90%;padding:11px 14px;border-radius:12px;font-size:13px;line-height:1.65;white-space:pre-wrap;}
+.bubble.user{background:var(--gold);color:#080a0f;align-self:flex-end;font-weight:500;}
+.bubble.ai{background:var(--surface);border:1px solid var(--border);color:var(--text);align-self:flex-start;}
+.bubble.typing{background:var(--surface);border:1px solid var(--border);color:var(--muted);align-self:flex-start;}
+.chat-input-area{padding:16px;border-top:1px solid var(--border);}
+.chat-row{display:flex;gap:8px;}
+.chat-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--text);font-size:13px;resize:none;height:44px;transition:border-color .2s;}
+.chat-input:focus{border-color:var(--gold2);}
+.chat-input::placeholder{color:var(--muted);}
+.chat-send{background:var(--gold);color:#080a0f;border:none;border-radius:9px;padding:0 18px;font-weight:700;font-size:13px;transition:background .15s;}
+.chat-send:hover{background:var(--gold2);}
+.chat-send:disabled{opacity:.4;}
+
+/* RR WIDGET */
+.rr-inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.rr-field label{display:block;font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;letter-spacing:.5px;}
+.rr-field input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 8px;font-family:var(--mono);font-size:13px;color:var(--text);}
+.rr-field input:focus{border-color:var(--gold2);}
+.rr-meter-track{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;margin-bottom:10px;}
+.rr-meter-fill{height:100%;border-radius:4px;transition:width .4s,background .4s;}
+.rr-verdict{padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:32px 16px;color:var(--muted);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+.empty-text{font-size:13px;line-height:1.6;}
+
+/* TABS */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);padding:0 20px;}
+.tab-btn{padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;transition:color .15s,border-color .15s;white-space:nowrap;}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold);font-weight:700;}
+
+/* SPINNER */
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* RESPONSIVE */
+@media(max-width:1100px){.main{grid-template-columns:260px 1fr 280px;}}
+@media(max-width:900px){
+  .main{grid-template-columns:1fr;grid-template-rows:auto;height:auto;}
+  .left-panel,.right-panel{border:none;border-bottom:1px solid var(--border);}
+  .center-panel{border:none;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">⚡</div>
+    <div>
+      <div class="brand-name">JeaFX Bot</div>
+      <div class="brand-sub">XAU/USD · SUPPLY & DEMAND</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div style="font-family:var(--mono);font-size:13px;color:var(--sub);">Gold price: <span id="priceDisplay" style="color:var(--gold);font-weight:600;">Loading...</span></div>
+    <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+  </div>
+</div>
+
+<!-- SESSION STRIP -->
+<div class="session-strip">
+  <div><span class="sess-name" id="sessName">—</span></div>
+  <div class="sess-tip" id="sessTip">—</div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main">
+
+  <!-- LEFT: CONTROLS + ZONES -->
+  <div class="left-panel">
+
+    <!-- SCAN -->
+    <div class="panel-section">
+      <div class="panel-title">Market Scanner</div>
+      <button class="scan-btn" id="scanBtn" onclick="runScan()">⚡ Scan XAU/USD Now</button>
+      <div id="alertBanner"></div>
+    </div>
+
+    <!-- ACTIVE ZONES -->
+    <div class="panel-section">
+      <div class="panel-title">Active Zones</div>
+      <div id="zoneList">
+        <div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-text">Zones appear after scan</div></div>
+      </div>
+    </div>
+
+    <!-- SIGNAL HISTORY -->
+    <div class="panel-section">
+      <div class="panel-title">Signal History</div>
+      <div id="historyList">
+        <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No signals yet</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: MAIN SIGNAL + CHAT -->
+  <div class="center-panel">
+
+    <!-- SIGNAL AREA -->
+    <div id="signalArea">
+      <div class="empty-state" style="padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:16px;">📊</div>
+        <div style="font-size:16px;font-weight:600;color:var(--sub);margin-bottom:8px;">Ready to scan XAU/USD</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7;">Click <strong style="color:var(--gold)">Scan XAU/USD Now</strong> to get a full market analysis with BUY, SELL, or WAIT signal — based on your JeaFX supply & demand strategy.</div>
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div style="border-top:1px solid var(--border);margin:4px 0 20px;"></div>
+
+    <!-- CHAT SECTION -->
+    <div class="panel-title" style="padding-left:2px;">🤖 Ask the AI Analyst</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div id="chatMessages" style="min-height:160px;max-height:320px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <div class="bubble ai">Hey! I'm your JeaFX AI analyst. Ask me anything — "Should I enter now?", "Is this zone fresh?", "Explain CHoCH", whatever you need. I'll give you a straight answer based on your S&D strategy. 👊</div>
+      </div>
+      <div style="padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;">
+        <input class="chat-input" id="chatInput" placeholder="Ask about your XAU/USD setup..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"/>
+        <button class="chat-send" id="sendBtn" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: CONFLUENCE + RR -->
+  <div class="right-panel">
+
+    <!-- CONFLUENCE CHECKLIST -->
+    <div class="panel-section">
+      <div class="panel-title">Confluence Checklist</div>
+      <div id="confluenceList">
+        <div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">Run a scan to see confluence factors</div></div>
+      </div>
+    </div>
+
+    <!-- CONFIDENCE METER -->
+    <div class="panel-section">
+      <div class="panel-title">Signal Confidence</div>
+      <div id="confidenceMeter">
+        <div class="confidence-wrap">
+          <div class="confidence-label-row">
+            <span class="confidence-label">Overall Confidence</span>
+            <span class="confidence-val" id="confVal" style="color:var(--muted);">—</span>
+          </div>
+          <div class="confidence-track">
+            <div class="confidence-fill" id="confFill" style="width:0%;background:var(--muted);"></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">Run a scan to calculate confidence based on your confluence factors.</div>
+      </div>
+    </div>
+
+    <!-- R:R CALCULATOR -->
+    <div class="panel-section">
+      <div class="panel-title">R:R Calculator</div>
+      <div class="rr-inputs">
+        <div class="rr-field">
+          <label>ENTRY</label>
+          <input type="number" id="rrE" placeholder="0.00" oninput="calcRR()" style="color:var(--gold);border-color:rgba(240,180,41,0.25);">
+        </div>
+        <div class="rr-field">
+          <label>STOP LOSS</label>
+          <input type="number" id="rrS" placeholder="0.00" oninput="calcRR()" style="color:var(--sell);border-color:rgba(244,63,94,0.25);">
+        </div>
+        <div class="rr-field">
+          <label>TAKE PROFIT</label>
+          <input type="number" id="rrT" placeholder="0.00" oninput="calcRR()" style="color:var(--buy);border-color:rgba(16,185,129,0.25);">
+        </div>
+      </div>
+      <div class="rr-meter-track"><div class="rr-meter-fill" id="rrFill" style="width:0%;background:var(--muted);"></div></div>
+      <div id="rrVerdict" class="rr-verdict" style="background:var(--surface2);color:var(--muted);">Enter levels above to check R:R</div>
+    </div>
+
+    <!-- JEAFX RULES -->
+    <div class="panel-section">
+      <div class="panel-title">JeaFX Rules</div>
+      <div style="font-size:12px;color:var(--sub);line-height:2;">
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span>Risk per trade</span><span style="color:var(--gold);font-family:var(--mono);">1%</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span>Min R:R</span><span style="color:var(--gold);font-family:var(--mono);">1:2</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span>Timeframes</span><span style="color:var(--gold);font-family:var(--mono);">D1→H4→H1</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span>SL placement</span><span style="color:var(--gold);font-family:var(--mono);">Below/Above zone</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;"><span>Best sessions</span><span style="color:var(--gold);font-family:var(--mono);">London / NY</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG & STATE
+// ============================================================
+const SYSTEM = `You are JeaFX Bot — an expert XAU/USD supply and demand trading analyst AI.
+
+The trader follows the JeaFX framework strictly:
+- Top-down analysis: Daily → H4 → H1/M15
+- Fresh supply/demand zones: strong departure candle (body >60% of range), price hasn't returned
+- Entry confirmations: CHoCH (Change of Character) + liquidity sweeps (wick beyond swing H/L that closes back)
+- Minimum R:R 1:2, risk 1% per trade
+- Best sessions: London (08:00–12:00 UTC) and New York overlap (12:00–17:00 UTC)
+
+For FULL SCAN requests, you MUST respond with this exact JSON structure (no extra text, just JSON):
+{
+  "signal": "BUY" | "SELL" | "WAIT",
+  "confidence": <number 0-100>,
+  "timeframe": "D1+H4" | "H4+H1" | "H1+M15",
+  "entry": <number or null>,
+  "sl": <number or null>,
+  "tp": <number or null>,
+  "supplyZone": {"high": <number>, "low": <number>} or null,
+  "demandZone": {"high": <number>, "low": <number>} or null,
+  "confluence": {
+    "freshZone": true|false,
+    "choch": true|false,
+    "liqSweep": true|false,
+    "htfBias": true|false,
+    "strongDeparture": true|false,
+    "sessionTiming": true|false,
+    "priceAtZone": true|false,
+    "rrValid": true|false
+  },
+  "reason": "<2-3 sentence clear explanation of WHY to take or skip this trade, specific to XAU/USD price action>"
+}
+
+For CHAT messages (not scans), respond normally in plain conversational text as a trading mentor would. Be direct, practical, concise.`;
+
+let conversationHistory = [];
+let signalHistory = [];
+let currentSignal = null;
+
+// ============================================================
+// SESSION
+// ============================================================
+function initSession() {
+  const h = new Date().getUTCHours();
+  let name, color, tip;
+  if (h >= 22 || h < 8)  { name="🌏 Asian Session";    color="#818cf8"; tip="Low volatility — only trade if price is deep inside a key untested zone."; }
+  else if (h < 12)        { name="🌍 London Session";   color="#f59e0b"; tip="Volatility rising — watch for early liquidity sweeps and CHoCH signals."; }
+  else if (h < 17)        { name="🌎 NY Overlap";       color="#10b981"; tip="Highest volume session — best time to trade XAU/USD. Stay focused."; }
+  else                    { name="🌎 NY Late Session";  color="#94a3b8"; tip="Volume declining — be cautious, false signals increase."; }
+  document.getElementById("sessName").textContent = name;
+  document.getElementById("sessName").style.color = color;
+  document.getElementById("sessTip").textContent = tip;
+}
+
+// ============================================================
+// PRICE FEED
+// ============================================================
+async function fetchPrice() {
+  try {
+    const r = await fetch("https://api.metals.live/v1/spot/gold");
+    const d = await r.json();
+    const p = d[0]?.price || d?.price;
+    if (p) document.getElementById("priceDisplay").textContent = "$" + parseFloat(p).toFixed(2);
+  } catch(e) {
+    // silent fail
+  }
+}
+
+// ============================================================
+// CLAUDE API
+// ============================================================
+async function callClaude(messages) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: SYSTEM,
+      messages
+    })
+  });
+  const data = await res.json();
+  return data.content?.map(b => b.text || "").join("") || "";
+}
+
+// ============================================================
+// FULL SCAN
+// ============================================================
+async function runScan() {
+  const btn = document.getElementById("scanBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Scanning...';
+
+  document.getElementById("signalArea").innerHTML = `
+    <div class="empty-state" style="padding:50px 20px;">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto 16px;"></div>
+      <div style="font-size:14px;color:var(--sub);">Analyzing Daily → H4 → H1...</div>
+    </div>`;
+
+  const now = new Date();
+  const h = now.getUTCHours();
+  const session = h >= 22||h<8?"Asian":h<12?"London":h<17?"New York Overlap":"New York Late";
+  const priceEl = document.getElementById("priceDisplay").textContent;
+
+  const scanPrompt = `FULL_SCAN_REQUEST
+UTC: ${now.toUTCString()}
+Session: ${session}
+Current XAU/USD price: ${priceEl}
+
+Analyze XAU/USD across Daily, H4, H1 timeframes using the JeaFX supply and demand strategy. Return ONLY the JSON object as specified.`;
+
+  try {
+    const msgs = [...conversationHistory, { role: "user", content: scanPrompt }];
+    const reply = await callClaude(msgs);
+    conversationHistory = [...msgs, { role: "assistant", content: reply }];
+
+    // Parse JSON
+    let data;
+    try {
+      const clean = reply.replace(/```json|```/g, "").trim();
+      data = JSON.parse(clean);
+    } catch(e) {
+      // Fallback: extract signal from text
+      const isBuy = /\bBUY\b/i.test(reply);
+      const isSell = /\bSELL\b/i.test(reply);
+      data = {
+        signal: isBuy?"BUY":isSell?"SELL":"WAIT",
+        confidence: 55,
+        timeframe: "H4+H1",
+        entry: null, sl: null, tp: null,
+        supplyZone: null, demandZone: null,
+        confluence: {freshZone:false,choch:/CHoCH/i.test(reply),liqSweep:/sweep/i.test(reply),htfBias:false,strongDeparture:false,sessionTiming:true,priceAtZone:false,rrValid:false},
+        reason: reply.substring(0, 300)
+      };
+    }
+
+    currentSignal = data;
+    renderSignal(data, now);
+    addToHistory(data, now);
+    renderZones(data);
+    renderConfluence(data.confluence);
+    renderConfidence(data.confidence, data.signal);
+    showAlertBanner(data);
+
+    // Browser notification
+    if (Notification.permission === "granted" && data.signal !== "WAIT") {
+      new Notification("JeaFX Alert — " + data.signal, { body: "XAU/USD " + data.signal + " signal detected! Open JeaFX Bot.", icon: "" });
+    }
+
+  } catch(e) {
+    document.getElementById("signalArea").innerHTML = `<div class="signal-card"><div style="color:var(--sell);font-size:13px;">❌ Scan failed: ${e.message}</div></div>`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "⚡ Scan XAU/USD Now";
+}
+
+// ============================================================
+// RENDER SIGNAL
+// ============================================================
+function renderSignal(d, time) {
+  const dirClass = d.signal.toLowerCase();
+  const dirEmoji = d.signal==="BUY"?"🟢":d.signal==="SELL"?"🔴":"⏳";
+  const borderColor = d.signal==="BUY"?"var(--buy)":d.signal==="SELL"?"var(--sell)":"var(--wait)";
+  const rrText = (d.entry && d.sl && d.tp) ? (() => {
+    const risk = Math.abs(d.entry - d.sl);
+    const reward = Math.abs(d.tp - d.entry);
+    return "1:" + (reward/risk).toFixed(1);
+  })() : "—";
+
+  document.getElementById("signalArea").innerHTML = `
+    <div class="signal-card" style="border-left:3px solid ${borderColor};">
+      <div class="signal-dir-row">
+        <div class="signal-dir ${dirClass}">${dirEmoji} ${d.signal}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="signal-tf-badge">${d.timeframe || "Multi-TF"}</span>
+          <span class="signal-tf-badge" style="color:${borderColor};">R:R ${rrText}</span>
+        </div>
+      </div>
+
+      ${(d.entry && d.sl && d.tp) ? `
+      <div class="levels-row">
+        <div class="level-box"><div class="level-lbl">ENTRY</div><div class="level-val entry">${d.entry.toFixed(2)}</div></div>
+        <div class="level-box"><div class="level-lbl">STOP LOSS</div><div class="level-val sl">${d.sl.toFixed(2)}</div></div>
+        <div class="level-box"><div class="level-lbl">TAKE PROFIT</div><div class="level-val tp">${d.tp.toFixed(2)}</div></div>
+      </div>` : ""}
+
+      <div class="analysis-text">📍 ${d.reason}</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:10px;">Scanned at ${time.toLocaleTimeString()}</div>
+    </div>
+
+    ${d.entry && d.sl && d.tp ? `<div style="font-size:12px;color:var(--muted);margin-top:-4px;margin-bottom:14px;">💡 Tip: Copy entry/SL/TP into the R:R calculator →</div>` : ""}`;
+
+  // Auto-fill R:R
+  if (d.entry) document.getElementById("rrE").value = d.entry.toFixed(2);
+  if (d.sl)    document.getElementById("rrS").value = d.sl.toFixed(2);
+  if (d.tp)    document.getElementById("rrT").value = d.tp.toFixed(2);
+  if (d.entry && d.sl && d.tp) calcRR();
+}
+
+// ============================================================
+// ALERT BANNER
+// ============================================================
+function showAlertBanner(d) {
+  const el = document.getElementById("alertBanner");
+  if (d.signal === "WAIT") { el.innerHTML = ""; return; }
+  const emoji = d.signal==="BUY"?"🔔":"🔔";
+  el.innerHTML = `<div class="alert-banner ${d.signal.toLowerCase()}">${emoji} ${d.signal} alert — XAU/USD ${d.signal} signal detected at ${new Date().toLocaleTimeString()}</div>`;
+  setTimeout(() => { el.innerHTML = ""; }, 8000);
+}
+
+// ============================================================
+// CONFLUENCE CHECKLIST
+// ============================================================
+function renderConfluence(c) {
+  if (!c) return;
+  const items = [
+    ["Fresh Zone",        c.freshZone],
+    ["CHoCH Confirmed",   c.choch],
+    ["Liquidity Sweep",   c.liqSweep],
+    ["HTF Bias Aligned",  c.htfBias],
+    ["Strong Departure",  c.strongDeparture],
+    ["Session Timing",    c.sessionTiming],
+    ["Price at Zone",     c.priceAtZone],
+    ["R:R Valid (1:2+)",  c.rrValid],
+  ];
+  const score = items.filter(i=>i[1]).length;
+  document.getElementById("confluenceList").innerHTML = `
+    <div class="confluence-grid">
+      ${items.map(([label,yes])=>`
+        <div class="conf-item">
+          <div class="conf-dot ${yes?'yes':'no'}"></div>
+          <span class="conf-label ${yes?'yes':''}">${label}</span>
+        </div>`).join("")}
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;font-family:var(--mono);">${score}/8 factors confirmed</div>`;
+}
+
+// ============================================================
+// CONFIDENCE METER
+// ============================================================
+function renderConfidence(score, signal) {
+  const color = score >= 70 ? "var(--buy)" : score >= 45 ? "var(--gold)" : "var(--sell)";
+  const label = score >= 70 ? "High confidence" : score >= 45 ? "Moderate confidence" : "Low confidence — consider waiting";
+  document.getElementById("confVal").textContent = score + "%";
+  document.getElementById("confVal").style.color = color;
+  document.getElementById("confFill").style.width = score + "%";
+  document.getElementById("confFill").style.background = color;
+  document.getElementById("confidenceMeter").querySelector("div:last-child").innerHTML =
+    `<span style="font-size:12px;color:${color};font-weight:600;">${label}</span><div style="font-size:11px;color:var(--muted);margin-top:4px;">Signal: ${signal} · ${score}% confidence based on ${Math.round(score/12.5)}/8 confluence factors</div>`;
+}
+
+// ============================================================
+// ZONES
+// ============================================================
+function renderZones(d) {
+  let html = "";
+  if (d.supplyZone) {
+    html += `<div class="zone-item">
+      <div><div class="zone-type" style="color:var(--sell);">Supply Zone</div><div class="zone-range">${d.supplyZone.low?.toFixed(2)} – ${d.supplyZone.high?.toFixed(2)}</div></div>
+      <span class="zone-fresh yes">Fresh</span>
+    </div>`;
+  }
+  if (d.demandZone) {
+    html += `<div class="zone-item">
+      <div><div class="zone-type" style="color:var(--buy);">Demand Zone</div><div class="zone-range">${d.demandZone.low?.toFixed(2)} – ${d.demandZone.high?.toFixed(2)}</div></div>
+      <span class="zone-fresh yes">Fresh</span>
+    </div>`;
+  }
+  document.getElementById("zoneList").innerHTML = html || '<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-text">No clear zones detected</div></div>';
+}
+
+// ============================================================
+// SIGNAL HISTORY
+// ============================================================
+function addToHistory(d, time) {
+  signalHistory.unshift({ signal: d.signal, time, confidence: d.confidence, reason: d.reason });
+  if (signalHistory.length > 10) signalHistory.pop();
+  const el = document.getElementById("historyList");
+  el.innerHTML = signalHistory.map(s => `
+    <div class="history-item">
+      <div class="history-badge ${s.signal.toLowerCase()}">${s.signal}</div>
+      <div>
+        <div class="history-meta">${s.time.toLocaleTimeString()} · ${s.confidence}% conf</div>
+        <div class="history-sum">${s.reason?.substring(0,80)}...</div>
+      </div>
+    </div>`).join("");
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+async function sendChat() {
+  const input = document.getElementById("chatInput");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+
+  const sendBtn = document.getElementById("sendBtn");
+  sendBtn.disabled = true;
+
+  const area = document.getElementById("chatMessages");
+
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = msg;
+  area.appendChild(userBubble);
+
+  const typing = document.createElement("div");
+  typing.className = "bubble typing";
+  typing.textContent = "Thinking...";
+  area.appendChild(typing);
+  area.scrollTop = area.scrollHeight;
+
+  try {
+    const msgs = [...conversationHistory, { role: "user", content: msg }];
+    const reply = await callClaude(msgs);
+    conversationHistory = [...msgs, { role: "assistant", content: reply }];
+    typing.className = "bubble ai";
+    typing.textContent = reply;
+  } catch(e) {
+    typing.className = "bubble ai";
+    typing.textContent = "Error: " + e.message;
+  }
+
+  sendBtn.disabled = false;
+  area.scrollTop = area.scrollHeight;
+}
+
+// ============================================================
+// R:R CALCULATOR
+// ============================================================
+function calcRR() {
+  const e = parseFloat(document.getElementById("rrE").value);
+  const s = parseFloat(document.getElementById("rrS").value);
+  const t = parseFloat(document.getElementById("rrT").value);
+  const fill    = document.getElementById("rrFill");
+  const verdict = document.getElementById("rrVerdict");
+
+  if (!e || !s || !t) {
+    fill.style.width = "0%";
+    verdict.style.background = "var(--surface2)";
+    verdict.style.color = "var(--muted)";
+    verdict.textContent = "Enter levels above to check R:R";
+    return;
+  }
+
+  const risk = Math.abs(e - s);
+  const reward = Math.abs(t - e);
+  const rr = reward / risk;
+  const pct = Math.min((rr / 5) * 100, 100);
+  const color = rr >= 2 ? "var(--buy)" : rr >= 1.5 ? "var(--gold)" : "var(--sell)";
+  const text = rr >= 3 ? "🔥 Excellent — Strong setup, take it"
+             : rr >= 2 ? "✅ Valid — Meets JeaFX minimum (1:2)"
+             : rr >= 1.5 ? "⚠️ Below ideal — Look for a better entry"
+             : "❌ Skip — R:R too low for this strategy";
+
+  fill.style.width = pct + "%";
+  fill.style.background = color;
+  verdict.style.background = color + "15";
+  verdict.style.color = color;
+  verdict.style.border = "1px solid " + color + "33";
+  verdict.innerHTML = `<div>${text}</div><div style="font-size:11px;margin-top:4px;opacity:0.8;">1:${rr.toFixed(2)} R:R · JeaFX min is 1:2</div>`;
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+if ("Notification" in window && Notification.permission === "default") {
+  Notification.requestPermission();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+initSession();
+setInterval(initSession, 60000);
+fetchPrice();
+setInterval(fetchPrice, 30000);
+</script>
+</body>
+</html>
