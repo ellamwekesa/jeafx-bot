@@ -1,0 +1,2 @@
+# jeafx-bot
+Trading analysis 
